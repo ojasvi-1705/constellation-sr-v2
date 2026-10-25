@@ -8,10 +8,7 @@ __pycache__/
 .env
 .env.*
 
-# Dataset and generated outputs
-data/
-outputs/
-samples/
+
 
 # Local database
 *.db
