@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Constellation SR</title>
+<style>
+:root{--bg:#e8edf1;--panel:#fff;--ink:#12263f;--muted:#5d6f84;--line:#cdd6df;--accent:#2a55e5;--on:#fff;--warn:#fff3cd;--warn-ink:#5c4400;--err:#b3261e}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1a29;--panel:#17263a;--ink:#e6edf5;--muted:#93a4b8;--line:#2a3b52;--accent:#6f92ff;--on:#0b1626;--warn:#3a3116;--warn-ink:#f3dc8a;--err:#ff8a80}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 "Segoe UI",system-ui,sans-serif}
+header{padding:24px 32px 4px;display:flex;flex-wrap:wrap;gap:8px 16px;align-items:baseline}
+h1{margin:0;font-size:28px;letter-spacing:-.01em}
+header p{margin:0;color:var(--muted);flex:1 1 320px}
+#dev{font-size:13px;color:var(--muted);border:1px solid var(--line);border-radius:99px;padding:2px 10px}
+#warn{display:none;margin:12px 32px 0;padding:10px 14px;border-radius:8px;background:var(--warn);color:var(--warn-ink);font-size:14px}
+main{display:grid;grid-template-columns:340px 1fr;gap:20px;padding:16px 32px 32px;max-width:1240px}
+@media (max-width:860px){main{grid-template-columns:1fr;padding:16px}header{padding:20px 16px 0}#warn{margin:12px 16px 0}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px}
+h2{font-size:14px;margin:18px 0 6px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+h2:first-child{margin-top:0}
+#drop{display:block;border:2px dashed var(--line);border-radius:8px;padding:22px 12px;text-align:center;cursor:pointer;color:var(--muted)}
+#drop:hover,#drop.over,#drop:focus-within{border-color:var(--accent);color:var(--ink)}
+#drop strong{display:block;color:var(--ink)}
+#file{position:absolute;opacity:0;width:1px;height:1px}
+.row{display:flex;gap:8px}
+input[type=url]{flex:1;min-width:0;font:inherit;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--ink)}
+button{font:inherit;font-weight:600;border:0;border-radius:8px;padding:10px 14px;cursor:pointer;background:var(--accent);color:var(--on)}
+button.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+button.wide{width:100%;padding:12px 16px;margin-top:14px}
+button:disabled{opacity:.45;cursor:not-allowed}
+button:focus-visible,input:focus-visible+span,input[type=url]:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+#samples{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+#samples button{padding:0;border:2px solid transparent;background:none;border-radius:6px;overflow:hidden;line-height:0}
+#samples button:hover{border-color:var(--accent)}
+#samples img{width:100%;aspect-ratio:1;object-fit:cover}
+.opt{display:flex;gap:10px;padding:5px 0}
+.opt small{display:block;color:var(--muted)}
+#msg{min-height:1.5em;margin:12px 0 0;font-size:14px;color:var(--muted)}
+#msg.err{color:var(--err)}
+#stage{position:relative;display:grid;place-items:center;min-height:420px;background:repeating-conic-gradient(var(--line) 0 25%,transparent 0 50%) 0 0/16px 16px;border-radius:8px;overflow:hidden}
+#empty{color:var(--muted);text-align:center;padding:24px;background:var(--panel);border-radius:8px;max-width:32ch}
+#cmp{position:relative;display:none;line-height:0;max-width:100%}
+#cmp img{display:block;max-width:100%;max-height:70vh;height:auto;image-rendering:pixelated}
+#cmp .top{position:absolute;inset:0;width:100%;height:100%;clip-path:inset(0 50% 0 0)}
+#bar{position:absolute;top:0;bottom:0;left:50%;width:2px;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.35);pointer-events:none}
+#range{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:ew-resize;margin:0}
+.tag{position:absolute;top:10px;padding:2px 8px;border-radius:6px;background:rgba(18,38,63,.8);color:#fff;font-size:13px;line-height:1.5}
+#tl{left:10px}#tr{right:10px;display:none}
+#stats{display:none;gap:24px;flex-wrap:wrap;margin-top:14px}
+#stats b{display:block;font-size:18px}#stats span{color:var(--muted);font-size:13px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Constellation SR</h1>
+  <p>Turn a low-resolution satellite image into a 2x higher-resolution one.</p>
+  <span id="dev" hidden></span>
+</header>
+<div id="warn" role="alert"></div>
+<main>
+  <section class="panel" aria-label="Input">
+    <h2>1. Image</h2>
+    <label id="drop" for="file"><strong>Choose, drop or paste an image</strong>PNG or JPG, up to 10 MB</label>
+    <input id="file" type="file" accept="image/png,image/jpeg">
+    <div class="row" style="margin-top:10px">
+      <input id="url" type="url" placeholder="or paste an image URL" aria-label="Image URL">
+      <button id="fetch" class="ghost">Fetch</button>
+    </div>
+    <h2>Try a sample</h2>
+    <div id="samples"></div>
+    <h2>2. Model</h2>
+    <label class="opt"><input type="radio" name="model" value="edsr" checked><span>EDSR<small>Faster, lighter</small></span></label>
+    <label class="opt"><input type="radio" name="model" value="rcan"><span>RCAN<small>Deeper, slower</small></span></label>
+    <button id="go" class="wide" disabled>Enhance image</button>
+    <button id="dl" class="wide ghost" style="display:none">Download result</button>
+    <p id="msg" role="status"></p>
+  </section>
+  <section class="panel" aria-label="Result">
+    <div id="stage">
+      <div id="empty">Your image and its enhanced version will appear here.</div>
+      <div id="cmp">
+        <img id="after" alt="Enhanced image"><img id="before" class="top" alt="Original image">
+        <div id="bar"></div><span class="tag" id="tl">Original</span><span class="tag" id="tr">Enhanced</span>
+        <input id="range" type="range" min="0" max="100" value="50" aria-label="Compare original and enhanced">
+      </div>
+    </div>
+    <div id="stats">
+      <div><b id="s-in">-</b><span>Input</span></div><div><b id="s-out">-</b><span>Output</span></div><div><b id="s-time">-</b><span>Time</span></div>
+    </div>
+  </section>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+let source=null,resultUrl=null,trained={};
+const msg=(t,e)=>{$('msg').textContent=t;$('msg').className=e?'err':''};
+const model=()=>document.querySelector('input[name=model]:checked').value;
+function warn(){const w=$('warn');if(trained[model()]===false){w.style.display='block';w.textContent='The '+model().toUpperCase()+' model has no trained weights yet, so results will not be meaningful. Train it with train.py first.'}else w.style.display='none'}
+document.querySelectorAll('input[name=model]').forEach(r=>r.onchange=warn);
+fetch('/info').then(r=>r.json()).then(i=>{trained=i.trained_weights;$('dev').hidden=false;$('dev').textContent=i.device==='cuda'?'GPU':'CPU';warn()}).catch(()=>{});
+['agricultural','buildings','harbor','intersection','runway','storagetanks'].forEach(n=>{
+  const b=document.createElement('button');b.innerHTML=`<img src="/static/samples/${n}.png" alt="Sample: ${n}">`;
+  b.onclick=async()=>{const blob=await (await fetch(`/static/samples/${n}.png`)).blob();setFile(new File([blob],n+'.png',{type:'image/png'}))};
+  $('samples').appendChild(b)});
+function setSplit(v){$('range').value=v;$('before').style.clipPath=`inset(0 ${100-v}% 0 0)`;$('bar').style.left=v+'%'}
+function show(src){$('empty').style.display='none';$('cmp').style.display='inline-block';$('before').src=src;$('after').src=src;$('tr').style.display='none';setSplit(50)}
+function reset(){resultUrl=null;$('dl').style.display='none';$('stats').style.display='none'}
+function setFile(f){
+  if(!f)return;if(!/^image\/(png|jpeg)$/.test(f.type)){msg('Use a PNG or JPG image.',true);return}
+  if(f.size>10*2**20){msg('Image is larger than 10 MB.',true);return}
+  source={file:f};reset();$('go').disabled=false;msg('Ready. Press Enhance image.');show(URL.createObjectURL(f))}
+$('file').onchange=e=>setFile(e.target.files[0]);
+addEventListener('paste',e=>{const f=[...e.clipboardData.files][0];if(f)setFile(f)});
+['dragover','dragenter'].forEach(v=>$('drop').addEventListener(v,e=>{e.preventDefault();$('drop').classList.add('over')}));
+['dragleave','drop'].forEach(v=>$('drop').addEventListener(v,e=>{e.preventDefault();$('drop').classList.remove('over')}));
+$('drop').addEventListener('drop',e=>setFile(e.dataTransfer.files[0]));
+$('fetch').onclick=()=>{const u=$('url').value.trim();if(!u){msg('Paste an image URL first.',true);return}
+  source={url:u};reset();$('go').disabled=false;msg('URL set. Press Enhance image.');show(u)};
+$('before').onerror=()=>{if(source&&source.url)msg('Preview blocked by the site, but the server can still fetch it. Press Enhance image.')};
+$('range').oninput=e=>setSplit(e.target.value);
+$('go').onclick=async()=>{
+  const fd=new FormData();fd.append('model',model());
+  let ep='/api/v1/infer';if(source.file)fd.append('file',source.file);else{fd.append('url',source.url);ep='/api/v1/infer-url'}
+  $('go').disabled=true;$('go').textContent='Enhancing...';msg('Processing. Large images and RCAN take longer.');
+  try{
+    const r=await fetch(ep,{method:'POST',body:fd});
+    if(!r.ok){const j=await r.json().catch(()=>({}));throw new Error(j.detail||'Processing failed.')}
+    resultUrl=URL.createObjectURL(await r.blob());
+    
+    $('after').src=resultUrl;$('tr').style.display='block';
+    $('s-in').textContent=r.headers.get('X-Input-Size');$('s-out').textContent=r.headers.get('X-Output-Size');
+    $('s-time').textContent=r.headers.get('X-Processing-Time')+' s';$('stats').style.display='flex';$('dl').style.display='block';
+    msg('Done. Drag the slider to compare.');
+  }catch(e){msg(e.message,true)}
+  $('go').disabled=false;$('go').textContent='Enhance image';
+};
+$('dl').onclick=()=>{const a=document.createElement('a');a.href=resultUrl;a.download='enhanced.png';a.click()};
+</script>
+</body>
+</html>
